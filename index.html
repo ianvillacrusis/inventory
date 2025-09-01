@@ -20,7 +20,7 @@
 </head>
 <body class="bg-light">
   <div class="container py-5">
-    <h1 class="mb-4 text-center">Inventory Tracker</h1>
+    <h1 class="mb-4 text-center">🏗️ Team Inventory Tracker</h1>
 
     <!-- ➕ Add Item Form -->
     <form id="add-form" class="row g-2 mb-4">
@@ -123,4 +123,108 @@
     addForm.addEventListener("submit", function (e) {
       e.preventDefault();
       const item = document.getElementById("item-name").value.trim();
-      const
+      const location = document.getElementById("item-location").value.trim();
+      const quantity = parseInt(document.getElementById("item-qty").value.trim());
+
+      if (item && location && quantity >= 0) {
+        addRow(item, location, quantity);
+        saveInventory();
+        addForm.reset();
+      }
+    });
+
+    // 🔍 Search
+    searchInput.addEventListener("input", function () {
+      const query = this.value.toLowerCase();
+      const rows = table.querySelectorAll("tr");
+      rows.forEach(row => {
+        const cells = row.querySelectorAll("td");
+        const match = Array.from(cells).slice(0, 3).some(cell =>
+          cell.textContent.toLowerCase().includes(query)
+        );
+        row.style.display = match ? "" : "none";
+      });
+    });
+
+    // 🧼 Clear
+    clearButton.addEventListener("click", function () {
+      searchInput.value = "";
+      const rows = table.querySelectorAll("tr");
+      rows.forEach(row => (row.style.display = ""));
+    });
+
+    // 🔃 Sort
+    headers.forEach(header => {
+      header.addEventListener("click", () => {
+        const columnIndex = parseInt(header.dataset.column);
+        const rows = Array.from(table.querySelectorAll("tr"));
+        const isNumeric = columnIndex === 2;
+
+        sortDirection[columnIndex] = !sortDirection[columnIndex];
+        const direction = sortDirection[columnIndex] ? 1 : -1;
+
+        headers.forEach(h => h.textContent = h.textContent.replace(/ ▲| ▼/, ""));
+        header.textContent += direction === 1 ? " ▲" : " ▼";
+
+        rows.sort((a, b) => {
+          const aText = a.children[columnIndex].textContent.trim();
+          const bText = b.children[columnIndex].textContent.trim();
+          return isNumeric
+            ? direction * (parseInt(aText) - parseInt(bText))
+            : direction * aText.localeCompare(bText);
+        });
+
+        rows.forEach(row => table.appendChild(row));
+      });
+    });
+
+    // ✏️ Edit/Delete
+    table.addEventListener("click", function (e) {
+      const row = e.target.closest("tr");
+      const cells = row.querySelectorAll("td");
+
+      if (e.target.classList.contains("edit-btn")) {
+        if (e.target.textContent === "Edit") {
+          for (let i = 0; i < 3; i++) {
+            const input = document.createElement("input");
+            input.value = cells[i].textContent;
+            input.className = "form-control form-control-sm";
+            cells[i].textContent = "";
+            cells[i].appendChild(input);
+          }
+          e.target.textContent = "Save";
+        } else {
+          for (let i = 0; i < 3; i++) {
+            const input = cells[i].querySelector("input");
+            cells[i].textContent = input.value;
+          }
+          e.target.textContent = "Edit";
+          saveInventory();
+        }
+      }
+
+      if (e.target.classList.contains("delete-btn")) {
+        if (confirm("Remove this item from inventory?")) {
+          row.remove();
+          saveInventory();
+        }
+      }
+    });
+
+    // 📄 Export CSV
+    exportCSV.addEventListener("click", () => {
+      const rows = table.querySelectorAll("tr");
+      let csv = "Item,Location,Quantity\n";
+      rows.forEach(row => {
+        const cells = row.querySelectorAll("td");
+        csv += `${cells[0].textContent},${cells[1].textContent},${cells[2].textContent}\n`;
+      });
+
+      const blob = new Blob([csv], { type: "text/csv" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "inventory.csv";
+      link.click();
+    });
+
+    // 🧾 Export PDF
