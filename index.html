@@ -2,229 +2,143 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Inventory Tracker</title>
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  />
   <style>
-    th.sortable {
-      cursor: pointer;
-      user-select: none;
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #f4f4f4;
     }
-    th.sortable:hover {
-      background-color: #f0f0f0;
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: #fff;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    input, button {
+      width: 100%;
+      padding: 0.6rem;
+      margin: 0.3rem 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      background: #0078D4;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #005a9e;
+    }
+    .item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #e9e9e9;
+      margin: 0.3rem 0;
+      padding: 0.5rem;
+      border-radius: 4px;
+    }
+    .item span {
+      flex: 1;
+    }
+    .actions button {
+      margin-left: 0.3rem;
+      background: #d9534f;
+    }
+    .actions button.edit {
+      background: #5bc0de;
+    }
+    @media (max-width: 600px) {
+      .item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .actions {
+        margin-top: 0.5rem;
+      }
     }
   </style>
 </head>
-<body class="bg-light">
-  <div class="container py-5">
-    <h1 class="mb-4 text-center">🏗️ Team Inventory Tracker</h1>
-
-    <!-- ➕ Add Item Form -->
-    <form id="add-form" class="row g-2 mb-4">
-      <div class="col-md-4">
-        <input type="text" id="item-name" class="form-control" placeholder="Item name" required />
-      </div>
-      <div class="col-md-4">
-        <input type="text" id="item-location" class="form-control" placeholder="Location" required />
-      </div>
-      <div class="col-md-2">
-        <input type="number" id="item-qty" class="form-control" placeholder="Qty" required />
-      </div>
-      <div class="col-md-2 d-grid">
-        <button type="submit" class="btn btn-success">Add Item</button>
-      </div>
-    </form>
-
-    <!-- 🔍 Search + Clear -->
-    <div class="input-group mb-3">
-      <input
-        type="text"
-        id="search-input"
-        class="form-control"
-        placeholder="Search inventory..."
-      />
-      <button class="btn btn-outline-secondary" type="button" id="clear-button">
-        Clear
-      </button>
-    </div>
-
-    <!-- 📤 Export Buttons -->
-    <div class="mb-3 d-flex gap-2">
-      <button class="btn btn-success" id="export-csv">Export CSV</button>
-      <button class="btn btn-secondary" id="export-pdf">Export PDF</button>
-    </div>
-
-    <!-- 📦 Inventory Table -->
-    <table class="table table-bordered table-striped">
-      <thead class="table-dark">
-        <tr>
-          <th class="sortable" data-column="0">Item</th>
-          <th class="sortable" data-column="1">Location</th>
-          <th class="sortable" data-column="2">Quantity</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="inventory-table"></tbody>
-    </table>
+<body>
+  <h1>📦 Inventory System</h1>
+  <div class="container">
+    <input type="text" id="search" placeholder="Search items..." oninput="renderItems()" />
+    <input type="text" id="itemName" placeholder="Item name" />
+    <input type="number" id="itemQty" placeholder="Quantity" />
+    <button onclick="addItem()">Add / Update Item</button>
+    <div id="inventoryList"></div>
   </div>
 
-  <!-- 🧠 Logic -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
-    const table = document.getElementById("inventory-table");
-    const searchInput = document.getElementById("search-input");
-    const clearButton = document.getElementById("clear-button");
-    const exportCSV = document.getElementById("export-csv");
-    const exportPDF = document.getElementById("export-pdf");
-    const headers = document.querySelectorAll("th.sortable");
-    const addForm = document.getElementById("add-form");
-    let sortDirection = {};
+    let items = JSON.parse(localStorage.getItem('inventory')) || [];
+    let editIndex = null;
 
-    // 🧠 Load from localStorage
-    function loadInventory() {
-      const data = JSON.parse(localStorage.getItem("inventoryData")) || [];
-      table.innerHTML = "";
-      data.forEach(row => addRow(row.item, row.location, row.quantity));
+    function saveItems() {
+      localStorage.setItem('inventory', JSON.stringify(items));
     }
 
-    // 💾 Save to localStorage
-    function saveInventory() {
-      const rows = table.querySelectorAll("tr");
-      const data = Array.from(rows).map(row => {
-        const cells = row.querySelectorAll("td");
-        return {
-          item: cells[0].textContent,
-          location: cells[1].textContent,
-          quantity: parseInt(cells[2].textContent)
-        };
-      });
-      localStorage.setItem("inventoryData", JSON.stringify(data));
-    }
+    function addItem() {
+      const name = document.getElementById('itemName').value.trim();
+      const qty = parseInt(document.getElementById('itemQty').value);
+      if (!name || isNaN(qty)) return;
 
-    // ➕ Add Row
-    function addRow(item, location, quantity) {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${item}</td>
-        <td>${location}</td>
-        <td>${quantity}</td>
-        <td>
-          <button class="btn btn-sm btn-primary edit-btn">Edit</button>
-          <button class="btn btn-sm btn-danger delete-btn">Delete</button>
-        </td>
-      `;
-      table.appendChild(tr);
-    }
-
-    // 📝 Add Item Form
-    addForm.addEventListener("submit", function (e) {
-      e.preventDefault();
-      const item = document.getElementById("item-name").value.trim();
-      const location = document.getElementById("item-location").value.trim();
-      const quantity = parseInt(document.getElementById("item-qty").value.trim());
-
-      if (item && location && quantity >= 0) {
-        addRow(item, location, quantity);
-        saveInventory();
-        addForm.reset();
+      if (editIndex !== null) {
+        items[editIndex] = { name, qty };
+        editIndex = null;
+      } else {
+        items.push({ name, qty });
       }
-    });
 
-    // 🔍 Search
-    searchInput.addEventListener("input", function () {
-      const query = this.value.toLowerCase();
-      const rows = table.querySelectorAll("tr");
-      rows.forEach(row => {
-        const cells = row.querySelectorAll("td");
-        const match = Array.from(cells).slice(0, 3).some(cell =>
-          cell.textContent.toLowerCase().includes(query)
-        );
-        row.style.display = match ? "" : "none";
-      });
-    });
+      document.getElementById('itemName').value = '';
+      document.getElementById('itemQty').value = '';
+      saveItems();
+      renderItems();
+    }
 
-    // 🧼 Clear
-    clearButton.addEventListener("click", function () {
-      searchInput.value = "";
-      const rows = table.querySelectorAll("tr");
-      rows.forEach(row => (row.style.display = ""));
-    });
+    function renderItems() {
+      const list = document.getElementById('inventoryList');
+      const search = document.getElementById('search').value.toLowerCase();
+      list.innerHTML = '';
 
-    // 🔃 Sort
-    headers.forEach(header => {
-      header.addEventListener("click", () => {
-        const columnIndex = parseInt(header.dataset.column);
-        const rows = Array.from(table.querySelectorAll("tr"));
-        const isNumeric = columnIndex === 2;
-
-        sortDirection[columnIndex] = !sortDirection[columnIndex];
-        const direction = sortDirection[columnIndex] ? 1 : -1;
-
-        headers.forEach(h => h.textContent = h.textContent.replace(/ ▲| ▼/, ""));
-        header.textContent += direction === 1 ? " ▲" : " ▼";
-
-        rows.sort((a, b) => {
-          const aText = a.children[columnIndex].textContent.trim();
-          const bText = b.children[columnIndex].textContent.trim();
-          return isNumeric
-            ? direction * (parseInt(aText) - parseInt(bText))
-            : direction * aText.localeCompare(bText);
+      items
+        .filter(item => item.name.toLowerCase().includes(search))
+        .forEach((item, index) => {
+          const div = document.createElement('div');
+          div.className = 'item';
+          div.innerHTML = `
+            <span>${item.name} — Qty: ${item.qty}</span>
+            <div class="actions">
+              <button class="edit" onclick="editItem(${index})">Edit</button>
+              <button onclick="deleteItem(${index})">Delete</button>
+            </div>
+          `;
+          list.appendChild(div);
         });
+    }
 
-        rows.forEach(row => table.appendChild(row));
-      });
-    });
+    function editItem(index) {
+      document.getElementById('itemName').value = items[index].name;
+      document.getElementById('itemQty').value = items[index].qty;
+      editIndex = index;
+    }
 
-    // ✏️ Edit/Delete
-    table.addEventListener("click", function (e) {
-      const row = e.target.closest("tr");
-      const cells = row.querySelectorAll("td");
+    function deleteItem(index) {
+      items.splice(index, 1);
+      saveItems();
+      renderItems();
+    }
 
-      if (e.target.classList.contains("edit-btn")) {
-        if (e.target.textContent === "Edit") {
-          for (let i = 0; i < 3; i++) {
-            const input = document.createElement("input");
-            input.value = cells[i].textContent;
-            input.className = "form-control form-control-sm";
-            cells[i].textContent = "";
-            cells[i].appendChild(input);
-          }
-          e.target.textContent = "Save";
-        } else {
-          for (let i = 0; i < 3; i++) {
-            const input = cells[i].querySelector("input");
-            cells[i].textContent = input.value;
-          }
-          e.target.textContent = "Edit";
-          saveInventory();
-        }
-      }
-
-      if (e.target.classList.contains("delete-btn")) {
-        if (confirm("Remove this item from inventory?")) {
-          row.remove();
-          saveInventory();
-        }
-      }
-    });
-
-    // 📄 Export CSV
-    exportCSV.addEventListener("click", () => {
-      const rows = table.querySelectorAll("tr");
-      let csv = "Item,Location,Quantity\n";
-      rows.forEach(row => {
-        const cells = row.querySelectorAll("td");
-        csv += `${cells[0].textContent},${cells[1].textContent},${cells[2].textContent}\n`;
-      });
-
-      const blob = new Blob([csv], { type: "text/csv" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "inventory.csv";
-      link.click();
-    });
-
-    // 🧾 Export PDF
+    renderItems();
+  </script>
+</body>
+</html>
