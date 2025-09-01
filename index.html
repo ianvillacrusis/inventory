@@ -21,12 +21,13 @@
     h1 {
       text-align: center;
     }
-    form {
+    form, .buttons {
       display: flex;
       gap: 0.5rem;
       flex-wrap: wrap;
+      margin-top: 1rem;
     }
-    input, button {
+    input, button, select {
       padding: 0.5rem;
       font-size: 1rem;
       flex: 1;
@@ -41,27 +42,32 @@
       padding: 0.5rem;
       text-align: left;
     }
-    .buttons {
-      margin-top: 1rem;
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>📦 Inventory Tracker</h1>
+
     <form id="itemForm">
-      <input type="text" id="itemName" placeholder="Item Name" required />
+      <input type="text" id="itemName" placeholder="Item Name 🏊" required />
       <input type="number" id="itemQty" placeholder="Quantity" required />
       <button type="submit">Add Item</button>
     </form>
 
     <div class="buttons">
+      <select id="sortSelect">
+        <option value="">Sort By</option>
+        <option value="name">Name (A–Z)</option>
+        <option value="qty">Quantity (Low–High)</option>
+      </select>
+      <input type="text" id="filterInput" placeholder="Filter by name..." />
+    </div>
+
+    <div class="buttons">
       <button onclick="exportCSV()">Export CSV</button>
       <button onclick="exportPDF()">Export PDF</button>
       <input type="file" id="csvImport" accept=".csv" />
+      <button onclick="syncToCloud()">Sync to Google Sheet ☁️</button>
     </div>
 
     <table id="inventoryTable">
@@ -72,12 +78,13 @@
     </table>
   </div>
 
-  <!-- jsPDF CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
     const form = document.getElementById('itemForm');
     const tableBody = document.querySelector('#inventoryTable tbody');
     const csvInput = document.getElementById('csvImport');
+    const sortSelect = document.getElementById('sortSelect');
+    const filterInput = document.getElementById('filterInput');
 
     let inventory = JSON.parse(localStorage.getItem('inventory')) || [];
 
@@ -87,8 +94,22 @@
     }
 
     function renderTable() {
+      let filtered = [...inventory];
+      const sortBy = sortSelect.value;
+      const filterText = filterInput.value.toLowerCase();
+
+      if (filterText) {
+        filtered = filtered.filter(item => item.name.toLowerCase().includes(filterText));
+      }
+
+      if (sortBy === 'name') {
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+      } else if (sortBy === 'qty') {
+        filtered.sort((a, b) => a.qty - b.qty);
+      }
+
       tableBody.innerHTML = '';
-      inventory.forEach((item, index) => {
+      filtered.forEach((item, index) => {
         const row = document.createElement('tr');
         row.innerHTML = `
           <td>${item.name}</td>
@@ -147,6 +168,21 @@
       };
       reader.readAsText(file);
     });
+
+    sortSelect.addEventListener('change', renderTable);
+    filterInput.addEventListener('input', renderTable);
+
+    function syncToCloud() {
+      const url = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE'; // Replace with your actual URL
+      inventory.forEach(item => {
+        fetch(url, {
+          method: 'POST',
+          body: JSON.stringify(item),
+          headers: { 'Content-Type': 'application/json' }
+        });
+      });
+      alert('Synced to Google Sheet!');
+    }
 
     renderTable();
   </script>
