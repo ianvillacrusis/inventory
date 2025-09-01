@@ -3,90 +3,152 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Swim Team Inventory Tracker 🏊‍♂️</title>
+  <title>📦 Inventory Tracker</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f0f8ff;
-      padding: 20px;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #f4f4f4;
+    }
+    .container {
       max-width: 600px;
       margin: auto;
+      background: white;
+      padding: 1rem;
+      border-radius: 8px;
     }
     h1 {
       text-align: center;
-      color: #0077b6;
+    }
+    form {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
     }
     input, button {
-      padding: 10px;
-      margin: 5px;
-      width: calc(100% - 22px);
-      font-size: 1em;
+      padding: 0.5rem;
+      font-size: 1rem;
+      flex: 1;
     }
-    ul {
-      list-style: none;
-      padding: 0;
+    table {
+      width: 100%;
+      margin-top: 1rem;
+      border-collapse: collapse;
     }
-    li {
-      background: #e0f7fa;
-      margin: 5px 0;
-      padding: 10px;
-      border-radius: 5px;
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      text-align: left;
+    }
+    .buttons {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
     }
   </style>
 </head>
 <body>
-  <h1>🏊‍♂️ Swim Team Inventory</h1>
-  <input type="text" id="itemName" placeholder="Item name (e.g. Goggles)" />
-  <input type="number" id="itemQty" placeholder="Quantity" />
-  <button onclick="addItem()">➕ Add Item</button>
-  <ul id="inventoryList"></ul>
+  <div class="container">
+    <h1>📦 Inventory Tracker</h1>
+    <form id="itemForm">
+      <input type="text" id="itemName" placeholder="Item Name" required />
+      <input type="number" id="itemQty" placeholder="Quantity" required />
+      <button type="submit">Add Item</button>
+    </form>
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js"></script>
+    <div class="buttons">
+      <button onclick="exportCSV()">Export CSV</button>
+      <button onclick="exportPDF()">Export PDF</button>
+      <input type="file" id="csvImport" accept=".csv" />
+    </div>
 
+    <table id="inventoryTable">
+      <thead>
+        <tr><th>Item</th><th>Quantity</th><th>Actions</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- jsPDF CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
-    // 🔥 Replace with your Firebase config
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "your-project.firebaseapp.com",
-      projectId: "your-project-id",
-      storageBucket: "your-project.appspot.com",
-      messagingSenderId: "XXXX",
-      appId: "YOUR_APP_ID"
-    };
+    const form = document.getElementById('itemForm');
+    const tableBody = document.querySelector('#inventoryTable tbody');
+    const csvInput = document.getElementById('csvImport');
 
-    // Initialize Firebase
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    let inventory = JSON.parse(localStorage.getItem('inventory')) || [];
 
-    // Add item to Firestore
-    function addItem() {
-      const name = document.getElementById("itemName").value.trim();
-      const qty = parseInt(document.getElementById("itemQty").value);
-      if (name && qty > 0) {
-        db.collection("inventory").add({
-          name,
-          quantity: qty,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        document.getElementById("itemName").value = "";
-        document.getElementById("itemQty").value = "";
-      }
+    function saveInventory() {
+      localStorage.setItem('inventory', JSON.stringify(inventory));
+      renderTable();
     }
 
-    // Real-time listener
-    db.collection("inventory").orderBy("timestamp")
-      .onSnapshot(snapshot => {
-        const list = document.getElementById("inventoryList");
-        list.innerHTML = "";
-        snapshot.forEach(doc => {
-          const item = doc.data();
-          const li = document.createElement("li");
-          li.textContent = `🧺 ${item.name} — ${item.quantity}`;
-          list.appendChild(li);
-        });
+    function renderTable() {
+      tableBody.innerHTML = '';
+      inventory.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${item.name}</td>
+          <td>${item.qty}</td>
+          <td><button onclick="removeItem(${index})">❌</button></td>
+        `;
+        tableBody.appendChild(row);
       });
+    }
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const name = document.getElementById('itemName').value;
+      const qty = parseInt(document.getElementById('itemQty').value);
+      inventory.push({ name, qty });
+      saveInventory();
+      form.reset();
+    });
+
+    function removeItem(index) {
+      inventory.splice(index, 1);
+      saveInventory();
+    }
+
+    function exportCSV() {
+      const rows = [['Item', 'Quantity'], ...inventory.map(i => [i.name, i.qty])];
+      const csv = rows.map(r => r.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'inventory.csv';
+      a.click();
+    }
+
+    function exportPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.text('Inventory List', 10, 10);
+      inventory.forEach((item, i) => {
+        doc.text(`${item.name}: ${item.qty}`, 10, 20 + i * 10);
+      });
+      doc.save('inventory.pdf');
+    }
+
+    csvInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const lines = e.target.result.split('\n').slice(1);
+        lines.forEach(line => {
+          const [name, qty] = line.split(',');
+          if (name && qty) inventory.push({ name: name.trim(), qty: parseInt(qty.trim()) });
+        });
+        saveInventory();
+      };
+      reader.readAsText(file);
+    });
+
+    renderTable();
   </script>
 </body>
 </html>
