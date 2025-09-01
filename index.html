@@ -2,143 +2,91 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Inventory Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Swim Team Inventory Tracker 🏊‍♂️</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      margin: 0;
-      padding: 1rem;
-      background: #f4f4f4;
+      font-family: Arial, sans-serif;
+      background: #f0f8ff;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
     }
     h1 {
       text-align: center;
-      color: #333;
-    }
-    .container {
-      max-width: 600px;
-      margin: auto;
-      background: #fff;
-      padding: 1rem;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      color: #0077b6;
     }
     input, button {
-      width: 100%;
-      padding: 0.6rem;
-      margin: 0.3rem 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      padding: 10px;
+      margin: 5px;
+      width: calc(100% - 22px);
+      font-size: 1em;
     }
-    button {
-      background: #0078D4;
-      color: white;
-      border: none;
-      cursor: pointer;
+    ul {
+      list-style: none;
+      padding: 0;
     }
-    button:hover {
-      background: #005a9e;
-    }
-    .item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #e9e9e9;
-      margin: 0.3rem 0;
-      padding: 0.5rem;
-      border-radius: 4px;
-    }
-    .item span {
-      flex: 1;
-    }
-    .actions button {
-      margin-left: 0.3rem;
-      background: #d9534f;
-    }
-    .actions button.edit {
-      background: #5bc0de;
-    }
-    @media (max-width: 600px) {
-      .item {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-      .actions {
-        margin-top: 0.5rem;
-      }
+    li {
+      background: #e0f7fa;
+      margin: 5px 0;
+      padding: 10px;
+      border-radius: 5px;
     }
   </style>
 </head>
 <body>
-  <h1>📦 Inventory System</h1>
-  <div class="container">
-    <input type="text" id="search" placeholder="Search items..." oninput="renderItems()" />
-    <input type="text" id="itemName" placeholder="Item name" />
-    <input type="number" id="itemQty" placeholder="Quantity" />
-    <button onclick="addItem()">Add / Update Item</button>
-    <div id="inventoryList"></div>
-  </div>
+  <h1>🏊‍♂️ Swim Team Inventory</h1>
+  <input type="text" id="itemName" placeholder="Item name (e.g. Goggles)" />
+  <input type="number" id="itemQty" placeholder="Quantity" />
+  <button onclick="addItem()">➕ Add Item</button>
+  <ul id="inventoryList"></ul>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js"></script>
 
   <script>
-    let items = JSON.parse(localStorage.getItem('inventory')) || [];
-    let editIndex = null;
+    // 🔥 Replace with your Firebase config
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "your-project.firebaseapp.com",
+      projectId: "your-project-id",
+      storageBucket: "your-project.appspot.com",
+      messagingSenderId: "XXXX",
+      appId: "YOUR_APP_ID"
+    };
 
-    function saveItems() {
-      localStorage.setItem('inventory', JSON.stringify(items));
-    }
+    // Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
+    // Add item to Firestore
     function addItem() {
-      const name = document.getElementById('itemName').value.trim();
-      const qty = parseInt(document.getElementById('itemQty').value);
-      if (!name || isNaN(qty)) return;
-
-      if (editIndex !== null) {
-        items[editIndex] = { name, qty };
-        editIndex = null;
-      } else {
-        items.push({ name, qty });
-      }
-
-      document.getElementById('itemName').value = '';
-      document.getElementById('itemQty').value = '';
-      saveItems();
-      renderItems();
-    }
-
-    function renderItems() {
-      const list = document.getElementById('inventoryList');
-      const search = document.getElementById('search').value.toLowerCase();
-      list.innerHTML = '';
-
-      items
-        .filter(item => item.name.toLowerCase().includes(search))
-        .forEach((item, index) => {
-          const div = document.createElement('div');
-          div.className = 'item';
-          div.innerHTML = `
-            <span>${item.name} — Qty: ${item.qty}</span>
-            <div class="actions">
-              <button class="edit" onclick="editItem(${index})">Edit</button>
-              <button onclick="deleteItem(${index})">Delete</button>
-            </div>
-          `;
-          list.appendChild(div);
+      const name = document.getElementById("itemName").value.trim();
+      const qty = parseInt(document.getElementById("itemQty").value);
+      if (name && qty > 0) {
+        db.collection("inventory").add({
+          name,
+          quantity: qty,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
+        document.getElementById("itemName").value = "";
+        document.getElementById("itemQty").value = "";
+      }
     }
 
-    function editItem(index) {
-      document.getElementById('itemName').value = items[index].name;
-      document.getElementById('itemQty').value = items[index].qty;
-      editIndex = index;
-    }
-
-    function deleteItem(index) {
-      items.splice(index, 1);
-      saveItems();
-      renderItems();
-    }
-
-    renderItems();
+    // Real-time listener
+    db.collection("inventory").orderBy("timestamp")
+      .onSnapshot(snapshot => {
+        const list = document.getElementById("inventoryList");
+        list.innerHTML = "";
+        snapshot.forEach(doc => {
+          const item = doc.data();
+          const li = document.createElement("li");
+          li.textContent = `🧺 ${item.name} — ${item.quantity}`;
+          list.appendChild(li);
+        });
+      });
   </script>
 </body>
 </html>
