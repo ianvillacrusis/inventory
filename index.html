@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inventory Tracker</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <style>
+    th.sortable {
+      cursor: pointer;
+      user-select: none;
+    }
+    th.sortable:hover {
+      background-color: #f0f0f0;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <div class="container py-5">
+    <h1 class="mb-4 text-center">🏗️ Team Inventory Tracker</h1>
+
+    <!-- ➕ Add Item Form -->
+    <form id="add-form" class="row g-2 mb-4">
+      <div class="col-md-4">
+        <input type="text" id="item-name" class="form-control" placeholder="Item name" required />
+      </div>
+      <div class="col-md-4">
+        <input type="text" id="item-location" class="form-control" placeholder="Location" required />
+      </div>
+      <div class="col-md-2">
+        <input type="number" id="item-qty" class="form-control" placeholder="Qty" required />
+      </div>
+      <div class="col-md-2 d-grid">
+        <button type="submit" class="btn btn-success">Add Item</button>
+      </div>
+    </form>
+
+    <!-- 🔍 Search + Clear -->
+    <div class="input-group mb-3">
+      <input
+        type="text"
+        id="search-input"
+        class="form-control"
+        placeholder="Search inventory..."
+      />
+      <button class="btn btn-outline-secondary" type="button" id="clear-button">
+        Clear
+      </button>
+    </div>
+
+    <!-- 📤 Export Buttons -->
+    <div class="mb-3 d-flex gap-2">
+      <button class="btn btn-success" id="export-csv">Export CSV</button>
+      <button class="btn btn-secondary" id="export-pdf">Export PDF</button>
+    </div>
+
+    <!-- 📦 Inventory Table -->
+    <table class="table table-bordered table-striped">
+      <thead class="table-dark">
+        <tr>
+          <th class="sortable" data-column="0">Item</th>
+          <th class="sortable" data-column="1">Location</th>
+          <th class="sortable" data-column="2">Quantity</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="inventory-table"></tbody>
+    </table>
+  </div>
+
+  <!-- 🧠 Logic -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    const table = document.getElementById("inventory-table");
+    const searchInput = document.getElementById("search-input");
+    const clearButton = document.getElementById("clear-button");
+    const exportCSV = document.getElementById("export-csv");
+    const exportPDF = document.getElementById("export-pdf");
+    const headers = document.querySelectorAll("th.sortable");
+    const addForm = document.getElementById("add-form");
+    let sortDirection = {};
+
+    // 🧠 Load from localStorage
+    function loadInventory() {
+      const data = JSON.parse(localStorage.getItem("inventoryData")) || [];
+      table.innerHTML = "";
+      data.forEach(row => addRow(row.item, row.location, row.quantity));
+    }
+
+    // 💾 Save to localStorage
+    function saveInventory() {
+      const rows = table.querySelectorAll("tr");
+      const data = Array.from(rows).map(row => {
+        const cells = row.querySelectorAll("td");
+        return {
+          item: cells[0].textContent,
+          location: cells[1].textContent,
+          quantity: parseInt(cells[2].textContent)
+        };
+      });
+      localStorage.setItem("inventoryData", JSON.stringify(data));
+    }
+
+    // ➕ Add Row
+    function addRow(item, location, quantity) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${item}</td>
+        <td>${location}</td>
+        <td>${quantity}</td>
+        <td>
+          <button class="btn btn-sm btn-primary edit-btn">Edit</button>
+          <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+        </td>
+      `;
+      table.appendChild(tr);
+    }
+
+    // 📝 Add Item Form
+    addForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      const item = document.getElementById("item-name").value.trim();
+      const
